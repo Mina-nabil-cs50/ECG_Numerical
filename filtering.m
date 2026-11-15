@@ -1,161 +1,89 @@
+
 clc;
 clear;
 close all;
 
-%% 1 read the dataset
+%% 1. load the ecg dataset
+
+% Read the csv file
 data = readtable('ecg_with_time.csv');
 
-%% load columns 
+% Extract dataset columns
 sample = data.sample;
-ecg = data.MLII;
+ecg = double(data.MLII);
 time = data.time;
 
-%% display dataset info
+% Define sampling frequency and sampling interval
+fs = 360;
+h = 1/fs;
 
-fprintf('Total samples: %d\n', length(sample));
-fprintf('Sampling frequency: 360 Hz\n');
+% Display dataset information
+fprintf('\n===== DATASET INFORMATION =====\n');
+fprintf('Total samples: %d\n', length(ecg));
+fprintf('Sampling frequency: %d Hz\n', fs);
 fprintf('Total duration: %.2f seconds\n', time(end));
 
-%% extract 10 secs
-duration = 10;
 
-indices = time <= duration;
+%% 2. inspect the raw ecg signal
+
+% Extract the first 10 seconds
+indices = time <= 10;
 
 time_segment = time(indices);
 ecg_segment = ecg(indices);
 
-%% plot the raw ecg 
+% Plot the first 10 seconds
 figure;
-
 plot(time_segment, ecg_segment);
-
-title('Raw ECG Signal - First 10 Seconds');
+title('Raw ECG Signal');
 xlabel('Time (seconds)');
-ylabel('ECG Amplitude (MLII)');
-grid on;
- 
-%%
-%% STAGE 2: RAW ECG SIGNAL INSPECTION
-
-% Figure 1: Entire ECG recording
-figure;
-
-plot(time, ecg, 'b');
-title('Entire Raw ECG Recording');
-xlabel('Time (seconds)');
-ylabel('MLII Amplitude (ADC units)');
+ylabel('Amplitude (ADC units)');
 grid on;
 
 
-% Figure 2: First 10 seconds
-figure;
+%% 3. remove dc offset
 
-plot(time_segment, ecg_segment, 'b');
-title('Raw ECG - First 10 Seconds');
-xlabel('Time (seconds)');
-ylabel('MLII Amplitude (ADC units)');
-grid on;
+% Calculate the mean amplitude and subtract it from every sample
+% This moves the signal average towards zero without changing its shape
 
-
-% Figure 3: First 3 seconds (zoomed)
-zoom_indices = time <= 3;
-
-figure;
-
-plot(time(zoom_indices), ecg(zoom_indices), 'b');
-title('Raw ECG - First 3 Seconds (Zoomed)');
-xlabel('Time (seconds)');
-ylabel('MLII Amplitude (ADC units)');
-grid on;
-
-
-%% Sstage 2
-%%
-
-fprintf('\n raw ecg \n');
-
-% Location of minimum and maximum readings
-[min_value, min_index] = min(ecg);
-[max_value, max_index] = max(ecg);
-
-fprintf('Minimum amplitude: %d\n', min_value);
-fprintf('Minimum occurs at: %.6f seconds\n', time(min_index));
-
-fprintf('Maximum amplitude: %d\n', max_value);
-fprintf('Maximum occurs at: %.6f seconds\n', time(max_index));
-
-% Additional statistics
-fprintf('Median amplitude: %.2f\n', median(ecg));
-fprintf('Mean amplitude: %.2f\n', mean(ecg));
-fprintf('Amplitude range: %d\n', max(ecg) - min(ecg));
-
-% First 3 seconds statistics
-short_segment = ecg(zoom_indices);
-
-fprintf('\nFirst 3 seconds:\n');
-fprintf('Minimum: %d\n', min(short_segment));
-fprintf('Maximum: %d\n', max(short_segment));
-fprintf('Mean: %.2f\n', mean(short_segment));
-fprintf('Standard deviation: %.2f\n', std(double(short_segment)));
-
-%%%% STAGE 3: ECG PREPROCESSING
-
-% Convert signal to double precision
-ecg = double(ecg);
-
-% Remove DC offset
 ecg_centered = ecg - mean(ecg);
 
-% Plot original and centered signals
-figure;
-
-subplot(2,1,1);
-plot(time_segment, ecg_segment);
-title('Original ECG Signal');
-xlabel('Time (seconds)');
-ylabel('Amplitude (ADC units)');
-grid on;
-
-subplot(2,1,2);
-plot(time_segment, ecg_centered(1:length(time_segment)));
-title('ECG After DC Offset Removal');
-xlabel('Time (seconds)');
-ylabel('Amplitude (ADC units)');
-grid on;
-
-% Display results
 fprintf('\n===== DC OFFSET REMOVAL =====\n');
 fprintf('Original mean: %.2f\n', mean(ecg));
 fprintf('Centered mean: %.6f\n', mean(ecg_centered));
-%%
-%%
-%%
-%% The first numerical thing in the project, numerical differentiation 
-%h=1/360 
-% each second contains 360 samples 
 
-%% STAGE 4: NUMERICAL DIFFERENTIATION
 
-% interval
-h = 1/360;
+%% 4. numerical differentiation
+% Rising ECG waveform → positive derivative.
+% Falling ECG waveform → negative derivative.
+% Local peaks and valleys → derivative approximately zero.
 
-%first derivative
+% Calculate the first derivative using the central difference method
+% This measures the rate of change of the ECG amplitude
+
 ecg_derivative = zeros(size(ecg_centered));
 
+% Central difference for interior samples
 for i = 2:length(ecg_centered)-1
     ecg_derivative(i) = ...
         (ecg_centered(i+1) - ecg_centered(i-1)) / (2*h);
 end
 
-% forward difference for first sample
+% Forward difference for the first sample
 ecg_derivative(1) = ...
     (ecg_centered(2) - ecg_centered(1)) / h;
 
-% backward difference for last sample
+% Backward difference for the last sample
 ecg_derivative(end) = ...
     (ecg_centered(end) - ecg_centered(end-1)) / h;
 
-% plot first 3 seconds
+fprintf('\n===== NUMERICAL DIFFERENTIATION =====\n');
+fprintf('Maximum derivative: %.2f\n', max(ecg_derivative));
+fprintf('Minimum derivative: %.2f\n', min(ecg_derivative));
+fprintf('Mean absolute derivative: %.2f\n', ...
+    mean(abs(ecg_derivative)));
+
+% Plot the first 3 seconds of the signal and its derivative
 zoom_indices = time <= 3;
 
 figure;
@@ -174,70 +102,181 @@ xlabel('Time (seconds)');
 ylabel('Rate of Change (ADC units/second)');
 grid on;
 
-% display derivative statistics
-fprintf('\n===== NUMERICAL DIFFERENTIATION =====\n');
-fprintf('Maximum derivative: %.2f\n', max(ecg_derivative));
-fprintf('Minimum derivative: %.2f\n', min(ecg_derivative));
-fprintf('Mean absolute derivative: %.2f\n', ...
-    mean(abs(ecg_derivative)));
-%%
-%%Filter
-%% ECG FILTERING 
 
-fs = 360;
+%% 5. remove baseline wander
 
-% STEP 1: Estimate baseline using a 1-second moving average
+% Estimate the slowly changing baseline using a 361-sample moving average
+% The window is approximately one second long
+
 baseline_window = 361;
-
 baseline = movmean(ecg_centered, baseline_window);
 
-% STEP 2: Remove estimated baseline
+% Subtract the estimated baseline from the signal
 ecg_detrended = ecg_centered - baseline;
 
-% STEP 3: Smooth the signal using a 5-sample moving average
-smoothing_window = 5;
 
+%% 6. smooth the ecg signal
+
+% Apply a 5-sample moving average to reduce rapid fluctuations
+% This helps smooth the signal while preserving heartbeat features
+
+smoothing_window = 5;
 ecg_filtered = movmean(ecg_detrended, smoothing_window);
 
-% STEP 4: Plot comparison
+
+%% 7. compare filtering results
+
+% Plot the different preprocessing stages over the first 10 seconds
 
 figure;
 
 subplot(3,1,1);
-plot(time_segment, ecg_centered(1:length(time_segment)));
-title('Original Centered ECG');
+plot(time_segment, ecg_centered(indices));
+title('Centered ECG Signal');
 xlabel('Time (seconds)');
 ylabel('Amplitude');
 grid on;
 
 subplot(3,1,2);
-plot(time_segment, ecg_detrended(1:length(time_segment)));
+plot(time_segment, ecg_detrended(indices));
 title('After Baseline Wander Removal');
 xlabel('Time (seconds)');
 ylabel('Amplitude');
 grid on;
 
 subplot(3,1,3);
-plot(time_segment, ecg_filtered(1:length(time_segment)));
-title('After Moving Average Smoothing');
+plot(time_segment, ecg_filtered(indices));
+title('Final Filtered ECG Signal');
 xlabel('Time (seconds)');
 ylabel('Amplitude');
 grid on;
 
-% STEP 5: Display statistics
 
-fprintf('\n===== ECG FILTERING =====\n');
+%% 8. compare preprocessing results
 
-fprintf('Original standard deviation: %.2f\n', ...
-    std(ecg_centered));
+% Standard deviation measures the spread of signal amplitudes
+% Compare how each preprocessing operation changes the signal
 
-fprintf('After baseline removal: %.2f\n', ...
-    std(ecg_detrended));
-
-fprintf('After smoothing: %.2f\n', ...
-    std(ecg_filtered));
-
-
+fprintf('\n PREPROCESSING RESULTS \n');
+fprintf('Original standard deviation: %.2f\n', std(ecg));
+fprintf('Centered standard deviation: %.2f\n', std(ecg_centered));
+fprintf('After baseline removal: %.2f\n', std(ecg_detrended));
+fprintf('After smoothing: %.2f\n', std(ecg_filtered));
 %%
-%%
+%%From here we will use ecg_filtered to continue working
 
+%% 9. real-time r peak detection and heart rate
+
+% use the already filtered ecg signal
+% process it in chronological order
+
+chunk_size = 18;
+window_seconds = 5;
+
+% minimum distance between consecutive r peaks
+minimum_distance = round(0.25 * fs);
+
+% detection threshold
+threshold = 0.5 * max(ecg_filtered);
+
+% variables for storing detected peaks
+r_peaks = [];
+r_peak_times = [];
+
+% store the most recent rr intervals
+recent_rr = [];
+
+% create the live ecg graph
+figure;
+
+ecg_plot = plot(NaN, NaN, 'b');
+hold on;
+
+peak_plot = plot(NaN, NaN, 'ro', ...
+    'MarkerFaceColor', 'r');
+
+title('Live ECG and R-Peak Detection');
+xlabel('Time (seconds)');
+ylabel('Amplitude (ADC units)');
+legend('Filtered ECG', 'Detected R peaks');
+grid on;
+
+playback_clock = tic;
+
+fprintf('\n===== LIVE HEART RATE MONITOR =====\n');
+
+% process the filtered signal in chronological order
+for last_index = 3:chunk_size:length(ecg_filtered)
+
+    % current samples available
+    current_time = time(1:last_index);
+    current_ecg = ecg_filtered(1:last_index);
+
+    % inspect new samples for local maxima
+    first_new_index = max(2, last_index - chunk_size);
+
+    for i = first_new_index:last_index-1
+
+        if ecg_filtered(i) > ecg_filtered(i-1) && ...
+           ecg_filtered(i) >= ecg_filtered(i+1) && ...
+           ecg_filtered(i) > threshold
+
+            % check minimum distance between peaks
+            if isempty(r_peaks) || ...
+               i - r_peaks(end) >= minimum_distance
+
+                r_peaks(end+1) = i;
+                r_peak_times(end+1) = time(i);
+
+                % calculate the latest rr interval
+                if length(r_peak_times) >= 2
+
+                    new_rr = r_peak_times(end) - ...
+                             r_peak_times(end-1);
+
+                    recent_rr(end+1) = new_rr;
+
+                    % keep only the latest five intervals
+                    if length(recent_rr) > 5
+                        recent_rr = recent_rr(end-4:end);
+                    end
+
+                    % calculate current heart rate
+                    current_bpm = 60 / median(recent_rr);
+
+                    fprintf('Time: %.2f s | BPM: %.2f\n', ...
+                        time(i), current_bpm);
+
+                end
+
+            end
+
+        end
+
+    end
+
+    % update the graph
+    set(ecg_plot, ...
+        'XData', current_time, ...
+        'YData', current_ecg);
+
+    set(peak_plot, ...
+        'XData', r_peak_times, ...
+        'YData', ecg_filtered(r_peaks));
+
+    % show the latest five seconds
+    current_position = time(last_index);
+    x_start = max(0, current_position - window_seconds);
+
+    xlim([x_start, max(window_seconds, current_position)]);
+
+    drawnow limitrate;
+
+    % synchronize playback with recording time
+    remaining_time = time(last_index) - toc(playback_clock);
+
+    if remaining_time > 0
+        pause(remaining_time);
+    end
+
+end
