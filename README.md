@@ -1,2 +1,2 @@
-# ECG_Numerical
-ECG_Numerical
+# ECG_Numerical_Project
+ECG_Numerical_Project
