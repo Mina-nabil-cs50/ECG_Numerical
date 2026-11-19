@@ -1,15 +1,25 @@
+%here we use the integration mehtods trapezodial and simpson 1/3 rules
+
+
+% we used them to calculate the area under the ecg curve to compare results
+% of the two methods 
+
+% we get them in iterations and compare them side to side 
+
+
+%%
 
 clc;
 clear;
 close all;
 
-%% 1. Load ECG Data
+%% 1 Load ECG Data
 
 load('ECG_Processed_Data.mat');
 
 fprintf('\n===== ECG NUMERICAL INTEGRATION =====\n');
 
-% Analyze the first 10 seconds
+% the first 10 seconds
 start_time = 0;
 end_time = 10;
 
@@ -18,7 +28,7 @@ indices = find(time >= start_time & time <= end_time);
 t = time(indices);
 y = ecg_filtered(indices);
 
-% Simpson's 1/3 Rule requires an even number of intervals
+%Simpsons 1/3 Rule 
 if mod(length(t)-1, 2) ~= 0
     t = t(1:end-1);
     y = y(1:end-1);
@@ -31,7 +41,7 @@ fprintf('Sampling interval: %.6f seconds\n', h);
 fprintf('Number of samples: %d\n', length(y));
 fprintf('Number of intervals: %d\n', n);
 
-%% 2. Initialize Numerical Methods
+%% 2 Initialize Methods
 
 trapezoidal_area = 0;
 simpson_area = 0;
@@ -76,7 +86,7 @@ axis off;
 
 title('Live Numerical Integration Results');
 
-%% 4. Perform Integration Iterations
+%% 4 Perform Integration Iterations
 
 fprintf('\n');
 fprintf('%-12s %-15s %-22s %-22s\n', ...
@@ -88,7 +98,7 @@ playback_clock = tic;
 
 for i = 1:2:n
 
-    % Current three samples
+    % samples
     x0 = y(i);
     x1 = y(i+1);
     x2 = y(i+2);
@@ -100,26 +110,26 @@ for i = 1:2:n
     trapezoidal_area = trapezoidal_area + ...
         trapezoid_1 + trapezoid_2;
 
-    % Simpson's 1/3 Rule
+    % Simpsons 1/3 Rule
     simpson_iteration = (h/3) * (x0 + 4*x1 + x2);
 
     simpson_area = simpson_area + simpson_iteration;
 
-    % Save iteration results
+    %Save iteration results
     iteration(end+1) = (i+1)/2;
     iteration_time(end+1) = t(i+2);
 
     trapezoidal_history(end+1) = trapezoidal_area;
     simpson_history(end+1) = simpson_area;
 
-    % Print current iteration
+    %Print current iteration
     fprintf('%-12d %-15.4f %-22.6f %-22.6f\n', ...
         iteration(end), ...
         iteration_time(end), ...
         trapezoidal_area, ...
         simpson_area);
 
-    % Update shaded signed area
+    %Update shaded signed area
     current_t = t(1:i+2);
     current_y = y(1:i+2);
 
@@ -127,7 +137,7 @@ for i = 1:2:n
         'XData', [current_t; flipud(current_t)], ...
         'YData', [current_y; zeros(length(current_y),1)]);
 
-    % Update live numerical results
+    %Update live numerical results
     set(result_text, 'String', sprintf([ ...
         'Iteration: %d\n\n' ...
         'Time: %.4f seconds\n\n' ...
@@ -140,7 +150,7 @@ for i = 1:2:n
 
     drawnow;
 
-    % Maintain approximately original ECG playback speed
+    %Maintain approximately original ECG playback speed
     remaining_time = iteration_time(end) - toc(playback_clock);
 
     if remaining_time > 0

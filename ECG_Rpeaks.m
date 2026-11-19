@@ -1,4 +1,11 @@
+% here we load the data we processed and do some stuff then we find the R
+% peaks of the graph to calculate rr interval and BPM and classify the
+% heartrate 
+%we use a local maxima to find compare the samples to find the peaks
+%
 
+
+%%
 clc;
 clear;
 

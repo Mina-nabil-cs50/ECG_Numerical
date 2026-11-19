@@ -1,4 +1,20 @@
+%% we use differentiation to calculate the rate of change of a signal 
+%%so this tells us how quick the ecg changes if it weather if it increases
+%%or decreases, using central difference, the rule is
+%%f'(xi)=2h.(f(xi+1)-f(xi-1)
+% we use forward difference 
+% backward difference
+% central difference 
+%why? to calculate the ecg change over time
+%the 3 of them are approximatly the same but we use them 3 to get a more
+%accurate approximation for the signal to be smooth
 
+
+
+
+
+
+%%
 clc;
 clear;
 close all;
